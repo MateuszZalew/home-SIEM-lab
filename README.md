@@ -1,12 +1,29 @@
 # Wazuh SOC Lab
 
-[Troubleshooting](#troubleshooting)
-
 ## Overview
 
 This project is a home SOC lab built with **pfSense, Wazuh, Kali Linux, and Oracle VirtualBox**.
 
 The goal of the lab is to build a small network security monitoring environment where pfSense acts as a firewall, network traffic is logged and forwarded to Wazuh, and Wazuh analyzes the events and generates alerts based on custom detection rules.
+
+## Table of Contents
+
+- [Technologies](#technologies)
+---
+- [1. Wazuh Installation](#1-wazuh-installation)
+- [2. Kali Configuration](#2-kali-linux-configuration-and-wazuh-agent-creation)
+- [3. pfSense Network Configuration](#3-pfsense-network-configuration)
+- [4. pfSense Firewall Logging](#4-pfsense-firewall-logging)
+- [5. Inspecting raw pfSense Logs](#5-inspecting-raw-pfsense-logs)
+- [6. Wazuh and pfSense Integration](#6-wazuh-and-pfsense-integration)
+- [7. Wazuh Log Analysis](#7-wazuh-log-analysis)
+- [8. Custom Wazuh Rules](#8-custom-wazuh-rules)
+- [9. Testing the Custom Rule](#9-testing-the-custom-rule)
+- [10. Inspecting raw pfSense Logs](#5-inspecting-raw-pfsense-logs)
+---
+- [Troubleshooting](#troubleshooting)
+- [Future Improvements](#future-improvements)
+- [Project Status](#project-status)
 
 ## Technologies
 
@@ -21,13 +38,13 @@ The goal of the lab is to build a small network security monitoring environment 
 
 I downloaded the Wazuh virtual machine image with the pre-installed Wazuh components from the [official Wazuh documentation](https://documentation.wazuh.com/current/deployment-options/virtual-machine/virtual-machine.html)
 
-Next I retrieved the IP address assigned to Wazuh Server and used it to access the Wazuh Dashboard from a web browser.
+Next I retrieved the IP address assigned to the Wazuh Manager and used it to access the Wazuh Dashboard from a web browser.
 
 ![Wazuh Server IP](https://github.com/MateuszZalew/home-SIEM-lab/blob/6f8d56586f5f1728c310a0e1d909f7441518d589/screenshots/wazuh_ips.png)
 
 ![Wazuh Dashboard](https://github.com/MateuszZalew/home-SIEM-lab/blob/6f8d56586f5f1728c310a0e1d909f7441518d589/screenshots/wazuh_dashboard.png)
 
-# 2. Kali Linux Configuration & Wazuh Agent Creation
+# 2. Kali Linux Configuration and Wazuh Agent Creation
 
 Kali Linux was configured with an interface connected to the same Host-Only network as the pfSense LAN.
 
@@ -93,7 +110,7 @@ Protocol: ICMP
 
 ![pfSense Firewall Log](https://github.com/MateuszZalew/home-SIEM-lab/blob/6f8d56586f5f1728c310a0e1d909f7441518d589/screenshots/kali_ping_firewall_log.png)
 
-# 5. Inspecting Raw pfSense Logs
+# 5. Inspecting raw pfSense Logs
 
 After confirming that firewall events were visible in the pfSense GUI, the raw firewall logs were inspected directly from the pfSense console.
 
@@ -123,20 +140,20 @@ curl -I https://google.com
 
 ![pfSense raw Firewall log 02](https://github.com/MateuszZalew/home-SIEM-lab/blob/6f8d56586f5f1728c310a0e1d909f7441518d589/screenshots/raw_pfsense_firewall_log_02.png)
 
-# 6. Wazuh & pfSense Integration
+# 6. Wazuh and pfSense Integration
 
-The pfSense firewall logs were integrated with the Wazuh environment. As Syslog Contents that would be logged I ticked the following events:
+The pfSense firewall logs were integrated with the Wazuh environment. Under <strong>Syslog Contents</strong>, I selected the following event categories:
 - System
 - Firewall
 - DNS
 - DHCP
 - VPN
 
-Syslog sends data using UDP protocol through port 514, so the flow is like this:
+In this lab, pfSense sends Syslog messages to Wazuh Manager over UDP port 514:
 
-``
+```text
 pfSense -> Syslog/UDP 514 -> Wazuh Manager
-``
+```
 
 ![pfSense Remote Logging Options Page](https://github.com/MateuszZalew/home-SIEM-lab/blob/9f97ed5a8bb5b5fc16612c854db5e8a74da21205/screenshots/pfSense_integration_with_wazuh.png)
 
@@ -144,7 +161,7 @@ pfSense -> Syslog/UDP 514 -> Wazuh Manager
 
 The first step was to determine whether Wazuh already had support for pfSense filterlog events.
 
-The logs were tested using the Wazuh log analysis tool `'wazuh-logtest`. A raw UDP filterlog that we got in the previous step was passed:
+The logs were tested using the Wazuh log analysis tool `'wazuh-logtest`. A raw UDP `filterlog` event obtained in the previous step was submitted to the tool:
 
 ```
 sudo /var/ossec/bin/wazuh-logtest
@@ -154,9 +171,7 @@ Wazuh successfully decoded the event using the built-in `pf` decoder:
 
 ![Wazuh Logtest Default Decoder](https://github.com/MateuszZalew/home-SIEM-lab/blob/3ff4855767d800f9560de8f8db057fda33b48589/screenshots/wazuh_logtest_default_decoder_pf.png)
 
-The testing confirmed that Wazuh already provides a built-in pf decoder capable of extracting relevant information from pfSense firewall logs.
-
-The built-in decoder confirmed that Wazuh supports pfSense filterlog events. However, for this project I decided to create a custom decoder to explicitly extract the fields required by my custom detection rules.
+The testing confirmed that Wazuh already provides a built-in `pf` decoder capable of extracting relevant information from pfSense firewall logs. However, for this project I decided to create a custom decoder to explicitly extract the fields required by my custom detection rules.
 
 # 8. Custom Wazuh Rules
 
@@ -164,7 +179,7 @@ After confirming that Wazuh could correctly decode pfSense logs, custom detectio
 
 The rules were stored in `/var/ossec/etc/rules/pfsense-custom-rules.xml`.
 
-Current configuration:
+In this iteration of the project, I decided to validate the detection pipeline using the `Allowed Traffic` rule.
 
 ![Wazuh Custom Rules XML file](https://github.com/MateuszZalew/home-SIEM-lab/blob/9f97ed5a8bb5b5fc16612c854db5e8a74da21205/screenshots/wazuh_custom_rules.png)
 
@@ -183,11 +198,6 @@ Wazuh successfully generated the custom rule:
 ![Wazuh custom rule generated](https://github.com/MateuszZalew/home-SIEM-lab/blob/9f97ed5a8bb5b5fc16612c854db5e8a74da21205/screenshots/custom_wazuh_rule_test.png)
 
 This confirmed that the custom rule was functioning correctly.
-
-I could also see the rendered alerts processed by my custom rule by filtering rule.id in Wazuh Dashboard Discover tab:
-
-![Wazuh Dashboard Filter Alerts](https://github.com/MateuszZalew/home-SIEM-lab/blob/3ff4855767d800f9560de8f8db057fda33b48589/screenshots/wazuh_dashboard_filter_alerts.png)
-
 
 # Troubleshooting
 
@@ -237,27 +247,13 @@ The raw pfSense `filterlog` events were visible in Wazuh, for example:
 Aug 25 21:11:22 filterlog[34441]: 1,92,,100000101,em1,match,pass,in,4,0x0,,64,11860,0,DF,6,tcp,60,192.168.56.102,216.58.201.174,55922,443,...
 ```
 
-However, the built-in decoder did not provide the fields required for the custom detection rules. I therefore created a custom decoder:
+However, for this project I wanted to explicitly control the fields extracted from pfSense events and use a dedicated decoder for my custom detection rules. I therefore created a custom decoder:
 
 ```text
 /var/ossec/etc/decoders/pfsense-custom-decoder.xml
 ```
 
-The first version used this simple regex:
-
-```xml
-<decoder name="pfsense-fields">
-    <parent>pfsense-custom</parent>
-    <regex>filterlog</regex>
-    <order>srcip</order>
-</decoder>
-```
-
-After every change in the file I verified the configuration using:
-
-```bash
-sudo /var/ossec/bin/wazuh-analysisd -t
-```
+The initial decoder configuration contained an invalid regular expression, which prevented wazuh-manager from starting. I used `wazuh-analysisd -t` to validate the configuration before restarting the service and corrected the regex syntax.
 
 The custom decoder was then able to identify the pfSense event:
 
@@ -318,7 +314,7 @@ Wazuh Manager
        Level 5 alert
 ```
 
-The final test using real traffic generated from Kali confirmed that the custom rule was working. For example, a HTTPS connection generated an alert:
+The final test using real traffic generated from Kali confirmed that the custom rule was working. For example, an HTTPS connection generated an alert:
 
 ```text
 pfSense: Allowed traffic from 192.168.56.102 to 216.58.201.174
