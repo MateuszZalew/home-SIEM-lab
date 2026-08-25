@@ -176,15 +176,171 @@ Wazuh successfully generated the custom rule:
 
 ![Wazuh custom rule generated]()
 
-This confirms that the custom rule was functioning correctly.
+This confirmed that the custom rule was functioning correctly.
 
+I could also see the rendered alerts procced by my custom rule by filtering rule.id in Wazuh Dashboard Discover tab:
 
-
+![Wazuh Dashboard Filter Alerts]()
 
 
 # Troubleshooting
 
-This confirmed that pfSense was correctly logging traffic.
+Building the lab required troubleshooting several networking and configuration issues.
+
+## pfSense could not reach Netgate servers during pfSense installation
+
+During the initial pfSense installation, the Netgate installer reported:
+
+Cannot reach the Netgate Servers, please verify your network settings!
+
+The issue was investigated by checking:
+
+```bash
+ifconfig
+netstat -rn
+ping 10.0.2.2
+```
+
+The WAN interface initially did not have an IPv4 address.
+
+After obtaining an address through DHCP and configuring the default route and DNS settings, pfSense was able to communicate externally and the installation could continue.
+
+## Kali could not initially access pfSense
+
+The lab initially used an incorrect network configuration where the Kali VM and pfSense LAN were not on the same virtual network.
+
+The configuration was changed to use a Host-Only network.
+
+This created the isolated lab subnet:
+
+`192.168.56.0/24`
+
+After the change, Kali received:
+
+`192.168.56.102`
+
+and pfSense LAN was configured accordingly.
+
+## Custom pfSense Decoder
+
+While integrating pfSense with Wazuh, the firewall logs were successfully received by the Wazuh Manager, but they were not initially decoded correctly.
+
+The raw pfSense `filterlog` events were visible in Wazuh, for example:
+
+```text
+Aug 25 21:11:22 filterlog[34441]: 1,92,,100000101,em1,match,pass,in,4,0x0,,64,11860,0,DF,6,tcp,60,192.168.56.102,216.58.201.174,55922,443,...
+```
+
+However, the built-in decoder did not provide the fields required for the custom detection rules. I therefore created a custom decoder:
+
+```text
+/var/ossec/etc/decoders/pfsense-custom-decoder.xml
+```
+
+The first version used this simple regex:
+
+```xml
+<decoder name="pfsense-fields">
+    <parent>pfsense-custom</parent>
+    <regex>filterlog</regex>
+    <order>srcip</order>
+</decoder>
+```
+
+After every change in the file I verified the configuration using:
+
+```bash
+sudo /var/ossec/bin/wazuh-analysisd -t
+```
+
+The custom decoder was then able to identify the pfSense event:
+
+```text
+Phase 2:
+name: 'pfsense-custom'
+```
+
+The decoder was subsequently extended to extract relevant fields from the `filterlog` event:
+
+```text
+action: 'pass'
+id: '100000101'
+srcip: '192.168.56.102'
+dstip: '216.58.201.174'
+```
+
+Another issue occurred with the custom rule. The initial rule used:
+
+```xml
+<if_sid>87700</if_sid>
+```
+
+This referenced the built-in pfSense rule that was no longer being triggered after switching to the custom decoder. As a result, the rule did not fire during testing.
+
+The rule was changed to reference the custom decoder directly:
+
+```xml
+<rule id="100113" level="5">
+    <decoded_as>pfsense-custom</decoded_as>
+    <match>pass</match>
+    <description>pfSense: Allowed traffic from $(srcip) to $(dstip)</description>
+</rule>
+```
+
+After testing the configuration with `wazuh-logtest`, the complete processing pipeline worked as expected.
+
+![Wazuh Logtest]()
+
+```text
+pfSense
+   │
+   │ Syslog / UDP 514
+   ▼
+Wazuh Manager
+   │
+   ├── Pre-decoding
+   │
+   ├── Custom decoder: pfsense-custom
+   │      ├── action
+   │      ├── srcip
+   │      ├── dstip
+   │      └── pfSense rule ID
+   │
+   └── Custom rule: 100113
+          │
+          ▼
+       Level 5 alert
+```
+
+The final test using real traffic generated from Kali confirmed that the custom rule was working. For example, a HTTPS connection generated an alert:
+
+```text
+pfSense: Allowed traffic from 192.168.56.102 to 216.58.201.174
+```
+
+This troubleshooting process demonstrated the importance of validating each stage separately: log reception, decoding, field extraction, rule matching, and finally alert generation.
+
+# Future Improvements
+
+Planned extensions for the lab:
+
+- Test and detect blocked traffic
+
+- Integrate Suricata IDS and forward it's alerts to Wazuh
+
+- Create additional custom detection rules
+
+- Generate and detect suspicious network activity
+
+- Create Wazuh dashboard visualizations
+
+- Improve alert severity and rule categorization
+
+# Project Status
+
+Status: <strong>In progress</strong>
+
+The core pfSense + Wazuh integration is operational. The next stage will expand the lab with IDS capabilities and additional SOC detection scenarios.
 
 
 
