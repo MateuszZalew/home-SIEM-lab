@@ -6,21 +6,34 @@ This project is a home SOC lab built with **pfSense, Wazuh, Kali Linux, and Orac
 
 The goal of the lab is to build a small network security monitoring environment where pfSense acts as a firewall, network traffic is logged and forwarded to Wazuh, and Wazuh analyzes the events and generates alerts based on custom detection rules.
 
+## Architecture
+
+![Lab Architecture](https://github.com/MateuszZalew/home-SIEM-lab/blob/8874ca5796b910993ccabd2975b3d4700123f28c/screenshots/home_soc_lab_architecture.png)
+
 ## Table of Contents
 
 - [Technologies](#technologies)
----
+
+**Lab Setup & Configuration**
+
 - [1. Wazuh Installation](#1-wazuh-installation)
-- [2. Kali Configuration](#2-kali-linux-configuration-and-wazuh-agent-creation)
+- [2. Kali Linux Configuration and Wazuh Agent Creation](#2-kali-linux-configuration-and-wazuh-agent-creation)
 - [3. pfSense Network Configuration](#3-pfsense-network-configuration)
+
+**Logging & Integration**
+
 - [4. pfSense Firewall Logging](#4-pfsense-firewall-logging)
 - [5. Inspecting raw pfSense Logs](#5-inspecting-raw-pfsense-logs)
 - [6. Wazuh and pfSense Integration](#6-wazuh-and-pfsense-integration)
+
+**Wazuh Detection Rules & Testing**
+
 - [7. Wazuh Log Analysis](#7-wazuh-log-analysis)
 - [8. Custom Wazuh Rules](#8-custom-wazuh-rules)
 - [9. Testing the Custom Rule](#9-testing-the-custom-rule)
-- [10. Inspecting raw pfSense Logs](#5-inspecting-raw-pfsense-logs)
----
+
+**Additional Information**
+
 - [Troubleshooting](#troubleshooting)
 - [Future Improvements](#future-improvements)
 - [Project Status](#project-status)
